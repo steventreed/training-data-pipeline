@@ -23,6 +23,16 @@ Two trigger types, one codebase:
 - **Schedule-triggered** — a nightly cron backstop catches anything missed.
   Every operation is idempotent, so re-runs are harmless.
 
+## How it runs today
+
+There is no app and no server. The user-triggered paths run
+conversationally through Muse, an AI assistant: the user shares a Fitbod
+CSV or pings "just completed a run," Muse runs the ingestion, and returns
+post-workout analysis in the same conversation. The nightly backstop is a
+scheduled job. In product terms, the chat is the UI and the assistant is
+the orchestration layer — the Python code underneath doesn't know or care
+what invoked it, which is exactly what makes it portable later.
+
 ## The interesting problem: deduping full exports
 
 Fitbod exports your *entire* history every time (~9,500 sets), not just new
@@ -90,3 +100,18 @@ Watermarks:
   backstop only ever asks for new data.
 - Functions are import-safe (`if __name__ == "__main__"` guard), so a
   FastAPI backend could import the ingest functions directly later.
+
+## Roadmap: the coach loop
+
+The database exists to feed an AI coach. Next up, two jobs:
+
+- **Analysis** — after each workout, compare it against the training plan
+  and recent history (e.g. PRs, fatigue signals like elevated HR or pace
+  decay, missed targets) and write a structured summary back to the
+  database.
+- **Coach** — turn the summary plus training history into recommendations:
+  adjust upcoming workouts, flag recovery needs, fueling feedback. Output
+  format still open — chat, dashboard, or scheduled recap.
+
+The ingestion pipeline is deliberately coach-agnostic: it just makes clean,
+complete training data available. Any analysis layer can build on it.

@@ -62,6 +62,18 @@ Keeping Fitbod sets and Apple Health workouts separate preserves the detail from
 
 ## Usage
 
+### Quick demo
+
+From the repository folder, try the included synthetic data on a fresh database:
+
+```bash
+python pipeline.py init
+python pipeline.py fitbod sample-workout-export.csv
+python pipeline.py stats
+```
+
+The first import adds 8 sets from 13 rows and skips 5 duplicates. Importing the same file again adds 0 sets; the database stays at 8. This demo doesn't require the Apple Health tool.
+
 The Python code uses only the standard library; no pip packages are required. That keeps the Python setup simple, with fewer dependencies to install, update, and maintain.
 
 Apple Health imports also require an external tool (`health-cli`) available in my current setup. Without it, the Fitbod import still works.
@@ -75,9 +87,6 @@ python pipeline.py init
 # Import a Fitbod export (replace the path with your file)
 python pipeline.py fitbod path/to/WorkoutExport.csv
 
-# Try it with the included synthetic export: 13 rows in, 8 new sets, 5 duplicates skipped
-python pipeline.py fitbod sample-workout-export.csv
-
 # Import recent Apple Health workouts
 python pipeline.py health
 
@@ -88,7 +97,7 @@ python pipeline.py health --days 7
 python pipeline.py stats
 ```
 
-Sample output:
+Example from my personal training database:
 
 ```text
 $ python pipeline.py stats

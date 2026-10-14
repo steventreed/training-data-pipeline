@@ -1,0 +1,9 @@
+# Personal data -- never push the database or raw exports
+data/
+*.db
+*.db-*
+*.csv
+# Python noise
+__pycache__/
+*.pyc
+.DS_Store

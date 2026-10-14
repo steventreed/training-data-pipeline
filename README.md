@@ -114,10 +114,13 @@ away data — Apple Health holds the session's HR and calorie data, Fitbod
 holds the sets. The known cost: anything counting workouts or training
 time across both tables double-counts lifting days.
 
-Planned refactor: link, don't delete. Flag Apple Health workouts with a
-strength-type label that fall on a Fitbod date as `likely_fitbod_duplicate`,
-and teach analysis queries to prefer Fitbod detail for lifts and Apple
-Health for runs. Provenance stays intact; the double-count goes away.
+Planned refactor: link, don't delete, with type-aware canonical sources.
+Strength → Fitbod is canonical (set-level detail wins); cardio →
+Apple Health is canonical (GPS, HR, pace win). Flag probable duplicates
+without deleting either side. Matching needs time-window overlap, not just
+same date — daily treadmill entries and outdoor walks can share a date
+without being the same session. Provenance stays intact; the double-count
+goes away.
 
 ## Roadmap: the coach loop
 

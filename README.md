@@ -10,21 +10,25 @@ Today, the Python ingestion layer imports Fitbod workout exports and Apple Healt
 
 ## Architecture
 
-```
-User shares Fitbod CSV ──►┐
-                           ├─► Ingestion (this code) ──► training.db (SQLite)
-User pings after a run ──►┘         │                          │
-                                    │                          ▼
-                          nightly backstop (cron)      post-workout analysis
+```text
+Fitbod CSV exports ------> Python ingestion
+Apple Health workouts --->      |
+                                v
+                        training.db (SQLite)
+                                |
+                                v
+                        Analysis + AI coaching
 ```
 
-Two trigger types, one codebase:
+Ingestion runs in two ways:
 
-- **User-triggered** — the primary path. Sharing a CSV or pinging after a
-  workout runs the ingest. Only the user knows when the data is actually
-  ready (e.g. waiting ~3 min post-run so heart-rate recovery is captured).
-- **Schedule-triggered** — a nightly cron backstop catches anything missed.
-  Every operation is idempotent, so re-runs are harmless.
+- **On demand:** Sharing a Fitbod export or sending a message after a run
+  triggers an import.
+- **Nightly backstop:** A scheduled run checks recent Apple Health workouts
+  for anything missed.
+
+Database keys prevent duplicate entries when the same records are imported
+again.
 
 ## How it runs today
 

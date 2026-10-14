@@ -36,6 +36,22 @@ inside a single export.
 Apple Health workouts are simpler: Apple assigns each a unique ID, so the ID
 is the primary key and duplicates are impossible.
 
+## Data model
+
+Three tables in `training.db`:
+
+```sql
+fitbod_sets     (set_key TEXT PRIMARY KEY,  -- normalized fingerprint
+                 workout_date, exercise, reps, weight_kg,
+                 duration_s, distance_m, is_warmup, ingested_at)
+workouts        (healthkit_id TEXT PRIMARY KEY,  -- Apple's unique workout id
+                 workout_type, start_datetime, end_datetime, timezone,
+                 distance_m, duration_sec, avg_hr_bpm, max_hr_bpm,
+                 energy_kcal, avg_speed_mps, max_speed_mps,
+                 elevation_gain_m, is_indoor, ingested_at)
+ingestion_state (key TEXT PRIMARY KEY, value TEXT)  -- watermarks
+```
+
 ## Usage
 
 ```bash
@@ -47,8 +63,24 @@ python pipeline.py stats                             # counts + watermarks
 ```
 
 Zero dependencies — Python standard library only (`sqlite3`, `csv`,
-`argparse`, `subprocess`). Apple Health is read via the `health-cli`
-connector; swap `fetch_healthkit_workouts()` for any other source.
+`argparse`, `subprocess`).
+
+**Prerequisite:** Apple Health ingestion shells out to an external CLI
+(`health-cli`) via `subprocess`. It is a system binary on this machine, not
+a pip package — so "zero dependencies" still holds for the Python side.
+Without it, only the Fitbod path runs. `fetch_healthkit_workouts()` is the
+single seam where an alternative source (Garmin, Strava, mock data) slots in.
+
+Sample output:
+
+```text
+$ python pipeline.py stats
+Fitbod sets in database : 5,921
+Apple Health workouts   : 31
+Watermarks:
+  last_fitbod_ingest       2026-10-13T13:58:13+00:00
+  last_healthkit_ingest    2026-10-14T10:59:29.171470+00:00
+```
 
 ## Design notes
 

@@ -37,7 +37,7 @@ again.
 
 ## Workflow
 
-I interact with the pipeline through Muse, an AI assistant: I share a Fitbod CSV or send a message after a run (which promts Muse to pull Apple Health workout data), then receive post-workout analysis in the same conversation.
+I interact with the pipeline through Muse, an AI assistant: I share a Fitbod CSV or send a message after a run (which prompts Muse to pull Apple Health workout data), then receive post-workout analysis in the same conversation.
 
 The Python ingestion code is separate from the chat interface. That lets me change how I interact with the pipeline without changing the underlying import logic.
 

@@ -103,24 +103,23 @@ Watermarks:
 
 ## V1 trade-offs
 
-**No cross-source dedupe (yet).** Fitbod syncs high-level summaries to
-Apple Health, so a lifting session exists in both places: sets in
-`fitbod_sets`, a summary row in `workouts`. V1 ingests each source
-independently with its own dedupe key and never tries to reconcile them.
+**Sources are scoped by domain; no cross-source dedupe needed.** Fitbod is
+the strength source, Apple Health the cardio source. By construction the
+two never overlap, so there is nothing to reconcile — the dedupe problem
+is deleted rather than solved.
 
-Rationale: each source's ingest is idempotent and lossless on its own.
-Merging them at ingest time would couple the two paths and risk throwing
-away data — Apple Health holds the session's HR and calorie data, Fitbod
-holds the sets. The known cost: anything counting workouts or training
-time across both tables double-counts lifting days.
+Two findings drove this. First, the user never logs cardio in Fitbod: 100%
+of runs are recorded on Apple Watch. Second, the export nonetheless
+contains 1,600+ cardio rows (Running, Walking, Treadmill, Stair Stepper)
+spread across the full six-year history. Those are Apple Health workouts
+Fitbod synced in for display and re-exported — echoed data, not primary
+records. An earlier design (bidirectional, type-aware dedupe with
+time-window matching) was considered and dropped as unnecessary machinery.
 
-Planned refactor: link, don't delete, with type-aware canonical sources.
-Strength → Fitbod is canonical (set-level detail wins); cardio →
-Apple Health is canonical (GPS, HR, pace win). Flag probable duplicates
-without deleting either side. Matching needs time-window overlap, not just
-same date — daily treadmill entries and outdoor walks can share a date
-without being the same session. Provenance stays intact; the double-count
-goes away.
+Concretely: the Fitbod ingest skips cardio-type exercises via a small
+explicit blocklist (decided, not yet implemented). Timed core work like
+planks stays — duration alone doesn't make a row cardio. Raw CSVs are
+archived locally, so skipped rows remain recoverable.
 
 ## Roadmap: the coach loop
 

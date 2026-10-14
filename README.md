@@ -112,6 +112,12 @@ I considered matching workouts by type and time to catch that overlap. For my cu
 
 The Fitbod import excludes specific cardio exercise types. Timed core work, like planks, stays: an exercise having a duration doesn't make it cardio. I keep the original CSV exports locally, so excluded rows can be recovered if I revisit that decision.
 
+## How I built it
+
+I defined the problem and worked through the design with Muse, an AI assistant. I drew the pipeline diagram and decided which source to use for each type of training, what data points are important, how to handle duplicate records, and why SQLite was enough for this version.
+
+Muse wrote the Python code and SQL schema. I reviewed the code and asked for changes where it didn't match the design. I also caught instances where it supplied data that wasn't supported by the source, so checking against the original records became part of the process.
+
 ## What's next
 
 The next step is to make the combined training history useful in two ways:

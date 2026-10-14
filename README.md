@@ -1,7 +1,7 @@
 # Workout Data Pipeline
 
 A Python ingestion pipeline that builds a personal training database from
-weightlifting data (Fitbod) and running data (Apple Health / Apple Watch),
+weightlifting data (Fitbod) and marathon training running data (Apple Health / Apple Watch),
 feeding an AI coach layer. Built as a portfolio project with a product
 mindset — designed so it could serve many users, not just one.
 

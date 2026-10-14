@@ -35,63 +35,55 @@ Ingestion runs in two ways:
 Database keys prevent duplicate entries when the same records are imported
 again.
 
-## How it runs today
+## Workflow
 
-There is no app and no server. The user-triggered paths run
-conversationally through Muse, an AI assistant: the user shares a Fitbod
-CSV or pings "just completed a run," Muse runs the ingestion, and returns
-post-workout analysis in the same conversation. The nightly backstop is a
-scheduled job. In product terms, the chat is the UI and the assistant is
-the orchestration layer — the Python code underneath doesn't know or care
-what invoked it, which is exactly what makes it portable later.
+I interact with the pipeline through Muse, an AI assistant: I share a Fitbod CSV or send a message after a run (which promts Muse to pull Apple Health workout data), then receive post-workout analysis in the same conversation.
 
-## The interesting problem: deduping full exports
+The Python ingestion code is separate from the chat interface. That lets me change how I interact with the pipeline without changing the underlying import logic.
 
-Fitbod exports your *entire* history every time (~9,500 sets), not just new
-ones — and it spells the same number differently between exports
-(`7.937875915123695` vs `7.94`). So the pipeline fingerprints each set with a
-**normalized key** (date + exercise + reps + weight, cleaned and rounded),
-stores the key as the SQLite primary key, and lets `INSERT OR IGNORE` do the
-diffing. 9,586 rows in, 5,921 unique sets out — 3,665 duplicates were hiding
-inside a single export.
+## Handling duplicate workout data
 
-Apple Health workouts are simpler: Apple assigns each a unique ID, so the ID
-is the primary key and duplicates are impossible.
+Fitbod exports my entire workout history each time, not just the latest session. That means importing a new file would add the same sets again unless the pipeline checks what's already there. Comparing the raw rows isn't enough: the same weight can appear as `7.937875915123695` in one export and `7.94` in another.
+
+The pipeline cleans up the values and rounds the numbers, then combines the date, exercise, reps, weight, duration, and distance into a key for each set. That key is the SQLite primary key, so `INSERT OR IGNORE` skips sets that are already in the database.
+
+In my export, 9,586 rows became 5,921 unique sets after this check. That's 3,665 duplicate rows removed.
+
+Apple Health is simpler: its workout records already have an ID. Using that as the primary key means importing the same record again won't add another entry.
 
 ## Data model
 
-Three tables in `training.db`:
+The SQLite database (`training.db`) has three tables:
+- `fitbod_sets`: One row per imported Fitbod set, including the exercise, reps, weight, and workout date. The key described above prevents the same set from being added again.
+- `workouts`: One row per Apple Health workout, with fields for distance, duration, heart rate, and other workout metrics. Apple's workout ID is used to prevent repeat imports of the same record.
+- `ingestion_state`: Tracks import progress, including the latest Fitbod workout date imported and when Apple Health ingestion last ran.
 
-```sql
-fitbod_sets     (set_key TEXT PRIMARY KEY,  -- normalized fingerprint
-                 workout_date, exercise, reps, weight_kg,
-                 duration_s, distance_m, is_warmup, ingested_at)
-workouts        (healthkit_id TEXT PRIMARY KEY,  -- Apple's unique workout id
-                 workout_type, start_datetime, end_datetime, timezone,
-                 distance_m, duration_sec, avg_hr_bpm, max_hr_bpm,
-                 energy_kcal, avg_speed_mps, max_speed_mps,
-                 elevation_gain_m, is_indoor, ingested_at)
-ingestion_state (key TEXT PRIMARY KEY, value TEXT)  -- watermarks
-```
+Keeping Fitbod sets and Apple Health workouts separate preserves the detail from each source while making both available for analysis in one database.
 
 ## Usage
 
+The Python code uses only the standard library; no pip packages are required. That keeps the Python setup simple, with fewer dependencies to install, update, and maintain.
+
+Apple Health imports also require an external tool (`health-cli`) available in my current setup. Without it, the Fitbod import still works.
+
+Run these commands from the repository folder:
+
 ```bash
-python pipeline.py init                            # create training.db
+# Create the database and tables
+python pipeline.py init
+
+# Import a Fitbod export (replace the path with your file)
 python pipeline.py fitbod path/to/WorkoutExport.csv
-python pipeline.py health                           # recent workouts (post-ping)
-python pipeline.py health --days 7                  # nightly backstop sweep
-python pipeline.py stats                             # counts + watermarks
+
+# Import recent Apple Health workouts
+python pipeline.py health
+
+# Check the past seven days of Apple Health workouts
+python pipeline.py health --days 7
+
+# Show record counts and import progress
+python pipeline.py stats
 ```
-
-Zero dependencies — Python standard library only (`sqlite3`, `csv`,
-`argparse`, `subprocess`).
-
-**Prerequisite:** Apple Health ingestion shells out to an external CLI
-(`health-cli`) via `subprocess`. It is a system binary on this machine, not
-a pip package — so "zero dependencies" still holds for the Python side.
-Without it, only the Fitbod path runs. `fetch_healthkit_workouts()` is the
-single seam where an alternative source (Garmin, Strava, mock data) slots in.
 
 Sample output:
 
@@ -106,44 +98,27 @@ Watermarks:
 
 ## Design notes
 
-- **SQLite, not Postgres** — one file, zero ops. Postgres when (if) this
-  becomes multi-user.
-- **Watermarks** in `ingestion_state` remember the high-water mark, so the
-  backstop only ever asks for new data.
-- Functions are import-safe (`if __name__ == "__main__"` guard), so a
-  FastAPI backend could import the ingest functions directly later.
+- **Start simple:** SQLite keeps the database in one file, without a separate database server to manage. That suits a personal project. I'd revisit the database choice if usage grows and the requirements change.
+- **Track import progress:** `ingestion_state` records the latest Fitbod workout date imported and when Apple Health ingestion last ran. The Apple Health backstop checks a recent date range, with database keys preventing repeat entries.
+- **Keep the import logic reusable:** The ingestion functions can be imported without running the command-line interface. That gives me a way to reuse them if I add a web app later.
 
 ## V1 trade-offs
 
-**Sources are scoped by domain; no cross-source dedupe needed.** Fitbod is
-the strength source, Apple Health the cardio source. By construction the
-two never overlap, so there is nothing to reconcile — the dedupe problem
-is deleted rather than solved.
+For this version, I'm using Fitbod for strength training and Apple Health for cardio, rather than trying to match the same workout across both sources.
 
-Two findings drove this. First, the user never logs cardio in Fitbod: 100%
-of runs are recorded on Apple Watch. Second, the export nonetheless
-contains 1,600+ cardio rows (Running, Walking, Treadmill, Stair Stepper)
-spread across the full six-year history. Those are Apple Health workouts
-Fitbod synced in for display and re-exported — echoed data, not primary
-records. An earlier design (bidirectional, type-aware dedupe with
-time-window matching) was considered and dropped as unnecessary machinery.
+I record my runs on Apple Watch, not in Fitbod. But my Fitbod export still contains 1,600+ cardio rows across six years of history, including running, walking, treadmill, and stair-stepper workouts synced from Apple Health. Importing those alongside the Apple Health records would count the same activity twice.
 
-Concretely: the Fitbod ingest skips cardio-type exercises via a small
-explicit blocklist (decided, not yet implemented). Timed core work like
-planks stays — duration alone doesn't make a row cardio. Raw CSVs are
-archived locally, so skipped rows remain recoverable.
+I considered matching workouts by type and time to catch that overlap. For my current workflow, it's simpler to use one source for each type of exercise.
 
-## Roadmap: the coach loop
+The Fitbod import excludes specific cardio exercise types. Timed core work, like planks, stays: an exercise having a duration doesn't make it cardio. I keep the original CSV exports locally, so excluded rows can be recovered if I revisit that decision.
 
-The database exists to feed an AI coach. Next up, two jobs:
+## What's next
 
-- **Analysis** — after each workout, compare it against the training plan
-  and recent history (e.g. PRs, fatigue signals like elevated HR or pace
-  decay, missed targets) and write a structured summary back to the
-  database.
-- **Coach** — turn the summary plus training history into recommendations:
-  adjust upcoming workouts, flag recovery needs, fueling feedback. Output
-  format still open — chat, dashboard, or scheduled recap.
+The next step is to make the combined training history useful in two ways:
 
-The ingestion pipeline is deliberately coach-agnostic: it just makes clean,
-complete training data available. Any analysis layer can build on it.
+- **Analysis:** Compare each workout with my training plan and recent history, then save a summary to the database. I'd want to see things like personal bests, missed targets, and changes in pace or heart rate that are worth a closer look.
+- **Coaching:** Use those summaries and my training history to suggest what to do next, including possible changes to upcoming workouts and when to prioritize recovery. Nutrition tracking and fueling feedback would follow.
+
+I haven't settled on the best way to present the recommendations yet: through the assistant, a dashboard, or a regular recap.
+
+The goal is to keep the training data separate from the AI model, so I can try different models for analysis and coaching without rebuilding the ingestion pipeline.

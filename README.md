@@ -1,9 +1,12 @@
 # Workout Data Pipeline
 
-A Python ingestion pipeline that builds a personal training database from
-weightlifting data (Fitbod) and marathon training running data (Apple Health / Apple Watch),
-feeding an AI coach layer. Built as a portfolio project with a product
-mindset — designed so it could serve many users, not just one.
+In training for marathons this year, I've found analyzing the many sources of data I have super helpful for making progress. Unfortunately, that data is siloed across various apps (eg Fitbod for weightlifting; Apple Watch/Health for running, heart rate, other vitals; Google Sheets for my training schedule; various LLMs for nutrition tracking). 
+
+To get feedback from AI, I've been manually sending snapshots of workout data to different LLMs. It's cumbersome and unreliable.
+
+I'm building this pipeline to bring that data together and keep my training data independent of any one AI model. The goal is to give analysis and coaching a consistent history to work from, while letting me change models without rebuilding the data pipeline.
+
+Today, the Python ingestion layer imports Fitbod workout exports and Apple Health workout records into SQLite and removes duplicates. Analysis and AI coaching are next. Nutrition tracking to follow. 
 
 ## Architecture
 

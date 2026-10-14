@@ -62,6 +62,10 @@ Keeping Fitbod sets and Apple Health workouts separate preserves the detail from
 
 ## Usage
 
+The Python code uses only the standard library; no pip packages are required. That keeps the Python setup simple, with fewer dependencies to install, update, and maintain.
+
+Apple Health imports also require an external tool (`health-cli`) available in my current setup. Without it, the Fitbod import still works.
+
 ### Quick demo
 
 From the repository folder, try the included synthetic data on a fresh database:
@@ -74,9 +78,7 @@ python pipeline.py stats
 
 The first import adds 8 sets from 13 rows and skips 5 duplicates. Importing the same file again adds 0 sets; the database stays at 8. This demo doesn't require the Apple Health tool.
 
-The Python code uses only the standard library; no pip packages are required. That keeps the Python setup simple, with fewer dependencies to install, update, and maintain.
-
-Apple Health imports also require an external tool (`health-cli`) available in my current setup. Without it, the Fitbod import still works.
+### Commands
 
 Run these commands from the repository folder:
 

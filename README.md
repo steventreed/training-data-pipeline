@@ -101,6 +101,24 @@ Watermarks:
 - Functions are import-safe (`if __name__ == "__main__"` guard), so a
   FastAPI backend could import the ingest functions directly later.
 
+## V1 trade-offs
+
+**No cross-source dedupe (yet).** Fitbod syncs high-level summaries to
+Apple Health, so a lifting session exists in both places: sets in
+`fitbod_sets`, a summary row in `workouts`. V1 ingests each source
+independently with its own dedupe key and never tries to reconcile them.
+
+Rationale: each source's ingest is idempotent and lossless on its own.
+Merging them at ingest time would couple the two paths and risk throwing
+away data — Apple Health holds the session's HR and calorie data, Fitbod
+holds the sets. The known cost: anything counting workouts or training
+time across both tables double-counts lifting days.
+
+Planned refactor: link, don't delete. Flag Apple Health workouts with a
+strength-type label that fall on a Fitbod date as `likely_fitbod_duplicate`,
+and teach analysis queries to prefer Fitbod detail for lifts and Apple
+Health for runs. Provenance stays intact; the double-count goes away.
+
 ## Roadmap: the coach loop
 
 The database exists to feed an AI coach. Next up, two jobs:

@@ -11,13 +11,18 @@ Today, the Python ingestion layer imports Fitbod workout exports and Apple Healt
 ## Architecture
 
 ```text
-Fitbod CSV exports ------> Python ingestion
-Apple Health workouts --->      |
-                                v
-                        training.db (SQLite)
-                                |
-                                v
-                        Analysis + AI coaching
+Fitbod CSV exports ----+
+                       |
+Apple Health workouts -+
+                       |
+                       v
+               Python ingestion
+                       |
+                       v
+             training.db (SQLite)
+                       |
+                       v
+            Analysis + AI coaching
 ```
 
 Ingestion runs in two ways:

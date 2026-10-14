@@ -75,6 +75,9 @@ python pipeline.py init
 # Import a Fitbod export (replace the path with your file)
 python pipeline.py fitbod path/to/WorkoutExport.csv
 
+# Try it with the included synthetic export: 13 rows in, 8 new sets, 5 duplicates skipped
+python pipeline.py fitbod sample-workout-export.csv
+
 # Import recent Apple Health workouts
 python pipeline.py health
 

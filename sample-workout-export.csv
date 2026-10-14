@@ -1,0 +1,14 @@
+Date,Exercise,Reps,Weight(kg),Duration(s),Distance(m),isWarmup
+2026-01-06 08:15:00 +0000,Bench Press,8,60,,,false
+2026-01-06 08:15:00 +0000,Bench Press,8,60,,,false
+2026-01-06 08:15:00 +0000,Bench Press,8,60.0,,,false
+2026-01-06 08:22:00 +0000,Squat,10,7.937875915123695,,,false
+2026-01-06 08:22:00 +0000,Squat,10,7.94,,,false
+2026-01-06 08:30:00 +0000,Overhead Press ,10,20,,,false
+2026-01-06 08:30:00 +0000,overhead press,10,20,,,false
+2026-01-08 18:05:00 +0000,Deadlift,5,100,,,false
+2026-01-08 18:05:00 +0000,Deadlift,5,102.5,,,false
+2026-01-08 18:12:00 +0000,Bench Press,8,62.5,,,false
+2026-01-08 18:20:00 +0000,Plank,,,90,,false
+2026-01-08 18:20:00 +0000,Plank,,,90.04,,false
+2026-01-08 18:25:00 +0000,Bench Press,8,40,,,true

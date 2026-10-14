@@ -3,6 +3,8 @@ data/
 *.db
 *.db-*
 *.csv
+# Exception: the synthetic demo export contains no real data
+!sample-workout-export.csv
 # Python noise
 __pycache__/
 *.pyc

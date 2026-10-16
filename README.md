@@ -11,7 +11,7 @@ Today, the Python ingestion layer imports Fitbod workout CSV exports and retriev
 ## Tools used
 
 - **Fitbod:** the app I lift with. It exports my workout history as a CSV, which is one of the pipeline's two inputs.
-- **Apple Health:** where my Apple Watch runs and heart-rate data live on my phone. It's the other input.
+- **Apple Health:** where my Apple Watch running workout and heart-rate data live on my phone. It's the other input.
 - **health-cli:** a command-line tool that ships with the Muse platform. The Python code calls it to read workouts from Apple Health.
 - **Python:** the language the ingestion code is written in. It's standard library only, so there's nothing extra to install.
 - **SQLite:** the database. My whole training history lives in a single file.

@@ -6,7 +6,7 @@ To get feedback from AI, I've been manually sending snapshots of workout data to
 
 I'm building this pipeline to bring that data together and keep my training data independent of any one AI model. The goal is to give analysis and coaching a consistent history to work from, while letting me change models without rebuilding the data pipeline.
 
-Today, the Python ingestion layer imports Fitbod workout exports and Apple Health workout records into SQLite and removes duplicates. Analysis and AI coaching are next. Nutrition tracking to follow. 
+Today, the Python ingestion layer imports Fitbod workout exports and Apple Health workout records into SQLite. It prevents repeat imports without dropping repeated sets I actually performed. Analysis and AI coaching are next. Nutrition tracking to follow. 
 
 ## Architecture
 
@@ -45,16 +45,18 @@ The Python ingestion code is separate from the chat interface. That lets me chan
 
 Fitbod exports my entire workout history each time, not just the latest session. That means importing a new file would add the same sets again unless the pipeline checks what's already there. Comparing the raw rows isn't enough: the same weight can appear as `7.937875915123695` in one export and `7.94` in another.
 
-The pipeline cleans up the values and rounds the numbers, then combines the date, exercise, reps, weight, duration, and distance into a key for each set. That key is the SQLite primary key, so `INSERT OR IGNORE` skips sets that are already in the database.
+The first version cleaned up the values, rounded the numbers, and built a key from the date, exercise, reps, weight, duration, and distance. But identical sets within a workout could share all those values, so the pipeline dropped real sets as duplicates.
 
-In my export, 9,586 rows became 5,921 unique sets after this check. That's 3,665 duplicate rows removed.
+I caught this while reviewing an audit sheet of flagged rows. An October 2020 workout had two sets of Cable Rope Tricep Extensions at 10 reps and 42.5 lb. Fitbod showed both; the database had one.
+
+Muse corrected the key by adding an occurrence number, so matching sets get separate keys. This preserves repeated sets while still preventing the same export from being imported twice. I confirmed the fix by reconciling the export against my actual in-app log in Fitbod.
 
 Apple Health is simpler: its workout records already have an ID. Using that as the primary key means importing the same record again won't add another entry.
 
 ## Data model
 
 The SQLite database (`training.db`) has three tables:
-- `fitbod_sets`: One row per imported Fitbod set, including the exercise, reps, weight, and workout date. The key described above prevents the same set from being added again.
+- `fitbod_sets`: One row per imported Fitbod set, including the exercise, reps, weight, and workout date. Its key combines the cleaned set values with an occurrence number.
 - `workouts`: One row per Apple Health workout, with fields for distance, duration, heart rate, and other workout metrics. Apple's workout ID is used to prevent repeat imports of the same record.
 - `ingestion_state`: Tracks import progress, including the latest Fitbod workout date imported and when Apple Health ingestion last ran.
 
@@ -76,7 +78,7 @@ python pipeline.py fitbod sample-workout-export.csv
 python pipeline.py stats
 ```
 
-The first import adds 8 sets from 13 rows and skips 5 duplicates. Importing the same file again adds 0 sets; the database stays at 8. This demo doesn't require the Apple Health tool.
+The first import adds all 13 sets. The sample includes repeated sets and numeric formatting differences on purpose; each row still represents a performed set. Importing the same file again adds 0 sets, so the database stays at 13. This demo doesn't require the Apple Health tool.
 
 ### Commands
 
@@ -99,14 +101,14 @@ python pipeline.py health --days 7
 python pipeline.py stats
 ```
 
-Example from my personal training database:
+Example from my personal training database after the rebuild:
 
 ```text
 $ python pipeline.py stats
-Fitbod sets in database : 5,921
+Fitbod sets in database : 7,940
 Apple Health workouts   : 31
 Watermarks:
-  last_fitbod_ingest       2026-10-13T13:58:13+00:00
+  last_fitbod_ingest       2026-10-12T14:39:02+00:00
   last_healthkit_ingest    2026-10-14T10:59:29.171470+00:00
 ```
 
@@ -114,6 +116,7 @@ Watermarks:
 
 - **Start simple:** SQLite keeps the database in one file, without a separate database server to manage. That suits a personal project. I'd revisit the database choice if usage grows and the requirements change.
 - **Track import progress:** `ingestion_state` records the latest Fitbod workout date imported and when Apple Health ingestion last ran. The Apple Health backstop checks a recent date range, with database keys preventing repeat entries.
+- **Check against the source:** Reproducing a database result only proves that the code is consistent with itself. The duplicate-set bug became clear only after I compared the flagged rows with the Fitbod app.
 - **Keep the import logic reusable:** The ingestion functions can be imported without running the command-line interface. That gives me a way to reuse them if I add a web app later.
 
 ## V1 trade-offs
@@ -125,6 +128,8 @@ I record my runs on Apple Watch, not in Fitbod. But my Fitbod export still conta
 I considered matching workouts by type and time to catch that overlap. For my current workflow, it's simpler to use one source for each type of exercise.
 
 The Fitbod import excludes specific cardio exercise types. Timed core work, like planks, stays: an exercise having a duration doesn't make it cardio. I keep the original CSV exports locally, so excluded rows can be recovered if I revisit that decision.
+
+Imports add records but don't sync edits or deletions to completed workouts. I've never gone back and edited a completed workout, so I'm leaving that as a known limit. If it ever matters, I can rebuild from a current full export.
 
 ## How I built it
 

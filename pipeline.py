@@ -112,6 +112,23 @@ DB_PATH = DATA_DIR / "training.db"
 # place instead of scattered through the code.
 HEALTH_CLI = "/opt/hatch/bin/health-cli"
 
+# --- Fitbod cardio blocklist ---
+# SOURCE-DOMAIN RULE: Fitbod is the strength source; Apple Health is the
+# cardio source. The cardio rows in a Fitbod export (running, walking,
+# treadmill, stair stepper) are NOT workouts logged in Fitbod -- they are
+# Apple Health workouts that Fitbod synced in and re-exported. Importing
+# them here would count the same activity twice, once per source.
+# Matching is exact and case-insensitive on the exercise name: a substring
+# match would be wrong ("Crunches" contains "run" but is core work and
+# stays). Timed strength/core work such as planks has a duration but is not
+# cardio, so it stays too.
+FITBOD_CARDIO_BLOCKLIST = frozenset({
+    "walking",
+    "walking - treadmill",
+    "running",
+    "stair stepper",
+})
+
 
 # ---------------------------------------------------------------------------
 # DATABASE
@@ -146,13 +163,19 @@ def init_db():
     cur = conn.cursor()
 
     # --- fitbod_sets: one row per weightlifting set, from the CSV export. ---
-    # The PRIMARY KEY is the normalized key (see make_set_key). Because the
-    # database enforces uniqueness on it, inserting the same set twice is
-    # impossible -- the second insert is silently skipped (OR IGNORE).
-    # That single constraint IS the dedupe mechanism for Fitbod data.
+    # The PRIMARY KEY is the normalized fingerprint PLUS an occurrence index
+    # ("<fingerprint>#<n>"), where n counts which time this fingerprint
+    # appears within its workout, in file order. The index is what keeps two
+    # identical sets in one workout (e.g. 3x10 at the same weight) as two
+    # distinct rows -- without it, the database would collapse them and
+    # silently delete real training volume (this happened: 3,662 sets were
+    # lost to exactly that bug, caught in the Oct 16, 2026 audit).
+    # Because re-ingesting the same export reproduces identical keys, the
+    # database still refuses true re-imports -- dedupe becomes a one-word
+    # SQL feature (OR IGNORE), now at the correct granularity.
     cur.execute("""
         CREATE TABLE IF NOT EXISTS fitbod_sets (
-            set_key     TEXT PRIMARY KEY,  -- normalized fingerprint of the set
+            set_key     TEXT PRIMARY KEY,  -- fingerprint + "#occurrence_index"
             workout_date TEXT NOT NULL,    -- ISO timestamp of when it happened
             exercise    TEXT NOT NULL,
             reps        REAL,
@@ -242,13 +265,13 @@ def set_state(key, value):
 # THE NORMALIZED DEDUPE KEY (Fitbod)
 # ---------------------------------------------------------------------------
 # THE PROBLEM, IN PLAIN ENGLISH:
-#   Every Fitbod export contains your ENTIRE history -- all ~9,576 sets --
+#   Every Fitbod export contains your ENTIRE history -- all ~9,586 sets --
 #   not just the new ones. So each import must answer: "which of these rows
 #   do I already have?" Comparing raw text lines fails, because Fitbod
 #   spells the same number differently between exports: one export writes
 #   7.937875915123695, the next writes 7.94. Same set, different text.
 #
-# THE FIX:
+# THE FIX, PART 1 -- A FINGERPRINT PER SET:
 #   For each set, build a FINGERPRINT from the fields that identify it --
 #   date, exercise, reps, weight, duration, distance -- AFTER cleaning them:
 #   strip stray spaces, round numbers to a sensible precision. Two exports
@@ -258,18 +281,55 @@ def set_state(key, value):
 #   to recognize the row. "Dedupe" = we keep only keys we haven't seen.
 #
 # WHY THESE FIELDS, AND WHY THIS PRECISION:
-#   date+exercise+reps+weight identifies a set in practice: you will not do
-#   the same exercise for the same reps at the same weight twice within one
-#   second. Rounding weight to 2 decimals absorbs Fitbod's float formatting
-#   wobble (10-decimal noise) while still distinguishing 20kg from 20.5kg.
-#   Duration/distance (1 decimal) are included so cardio entries, which have
-#   0 reps and 0 weight, still fingerprint uniquely.
+#   date+exercise+reps+weight identifies a set in practice. Rounding weight
+#   to 2 decimals absorbs Fitbod's float formatting wobble (10-decimal
+#   noise) while still distinguishing 20kg from 20.5kg. Duration/distance
+#   (1 decimal) are included so timed entries, which have 0 reps and
+#   0 weight, still fingerprint uniquely.
+#
+# THE FIX, PART 2 -- WHY THE FINGERPRINT ALONE IS NOT ENOUGH:
+#   (Lesson learned Oct 16, 2026, during the training-data audit.)
+#   Fitbod's Date column is WORKOUT-level: every set in one workout shares
+#   the same timestamp, to the second. So the fingerprint CANNOT tell apart
+#   two identical sets performed in the same workout -- and "3x10 at the
+#   same weight" is the most normal thing in lifting. The original code
+#   treated same-fingerprint rows as duplicates and silently deleted 3,662
+#   genuinely performed sets (46% of all strength volume). The audit caught
+#   it by checking the export against the Fitbod app set-for-set: there were
+#   never any true duplicates in the source at all.
+#
+#   The corrected scheme: the stored primary key is the fingerprint plus an
+#   occurrence index -- "<fingerprint>#<n>" -- where n counts which time
+#   this fingerprint appears within its workout, in file order. Identical
+#   sets in one workout get distinct keys (#0, #1, #2...) and are all kept.
+#   Re-ingesting the same export reproduces identical keys, so the database
+#   itself still refuses re-imports (OR IGNORE): the import is idempotent,
+#   and a new export's genuinely new workouts get fresh keys and insert
+#   normally. There is deliberately NO other dedupe: six years of exports
+#   contain zero true duplicates, and the previous attempt at catching them
+#   is what deleted nearly half the history. We err on the side of keeping
+#   real training data.
+#
+# KNOWN LIMITATION (documented, not hidden):
+#   If the source ever contained a literally duplicated workout (the same
+#   timestamp with the same sets listed twice), both copies would be
+#   ingested. This has never occurred in any export to date. If you EDIT an
+#   old workout in Fitbod (add/remove a set) and re-export, occurrence
+#   indices after the edit point can shift, and the changed sets may insert
+#   as new rows. Old workouts are never edited in practice, so both are
+#   accepted risks -- far preferable to the alternative, which silently
+#   deleted 46% of performed sets.
 
 def make_set_key(date_str, exercise, reps, weight_kg, duration_s, distance_m):
     """Build the normalized fingerprint identifying one Fitbod set.
 
     Args are the raw CSV strings. Returns a single string like:
         "2026-10-13T13:58:13+00:00|walking|0|0.00|314.1|441.5"
+
+    NOTE: this fingerprint alone is NOT unique per performed set -- two
+    identical sets in one workout share it (see the comment block above).
+    ingest_fitbod_csv() appends "#<occurrence_index>" to make the stored
+    primary key unique per set within its workout.
     """
     # Parse the CSV timestamp ("2026-10-13 13:58:13 +0000") into a real
     # datetime object, then re-emit it in ISO format. This canonicalizes
@@ -306,14 +366,22 @@ def make_set_key(date_str, exercise, reps, weight_kg, duration_s, distance_m):
 def ingest_fitbod_csv(csv_path):
     """Import a Fitbod WorkoutExport.csv, appending only genuinely new sets.
 
-    HOW THE DIFF WORKS:
+    HOW THE DIFF WORKS (see the comment block above make_set_key for the
+    full story):
       1. Read every row of the CSV.
-      2. Fingerprint each row with make_set_key().
-      3. INSERT OR IGNORE each row, using the fingerprint as the primary key.
-         Rows already in the database are skipped by the database itself --
-         there is no separate "compare" step; the primary-key constraint
-         does the diffing for us. Elegant and fast.
-      4. Count how many rows were actually new, and record a watermark.
+      2. Skip cardio-type rows (FITBOD_CARDIO_BLOCKLIST) -- those are echoed
+         Apple Health workouts, not Fitbod strength sets. Cardio comes from
+         the Apple Health path instead.
+      3. Group the remaining rows into workouts by their (workout-level)
+         timestamp, preserving file order within each group.
+      4. Fingerprint each set, then append "#<occurrence_index>" -- which
+         time this fingerprint appears within THIS workout, in file order --
+         to form the primary key. INSERT OR IGNORE each set: identical sets
+         in one workout get distinct keys and are all kept; re-ingesting the
+         same export reproduces identical keys, so the database itself skips
+         them. There is no separate "compare" step; the primary-key
+         constraint does the diffing for us. Elegant and fast.
+      5. Count how many rows were actually new, and record a watermark.
 
     Because skipped rows are simply ignored, this function is IDEMPOTENT:
     run it on the same file ten times and the database ends up identical.
@@ -333,11 +401,14 @@ def ingest_fitbod_csv(csv_path):
     before = conn.total_changes
 
     rows_seen = 0
+    cardio_skipped = 0
     newest_date = None
-    batch = []  # collect rows, then insert all at once (much faster)
 
-    # csv.DictReader turns each CSV row into a dict keyed by the header row,
-    # so we can write row["Exercise"] instead of counting columns.
+    # Group rows by workout timestamp, preserving file order within each
+    # group. Dicts remember insertion order; each group's list preserves
+    # the row order within the workout -- the occurrence index depends on
+    # that order being stable across exports (it is: newest-first, always).
+    workouts = {}
     with open(csv_path, newline="", encoding="utf-8-sig") as f:
         # utf-8-sig: Fitbod's export may start with a BOM (invisible byte
         # order mark). This encoding strips it so the first header isn't
@@ -349,37 +420,67 @@ def ingest_fitbod_csv(csv_path):
             if not date_str:
                 continue  # skip blank lines
 
-            key = make_set_key(
+            exercise = (row.get("Exercise") or "").strip()
+
+            # Cardio blocklist (see FITBOD_CARDIO_BLOCKLIST): echoed Apple
+            # Health workouts, not strength sets. Counted separately so the
+            # summary stays honest.
+            if exercise.lower() in FITBOD_CARDIO_BLOCKLIST:
+                cardio_skipped += 1
+                continue
+
+            dt = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S %z")
+            canonical_date = dt.isoformat()
+            if newest_date is None or dt > newest_date:
+                newest_date = dt
+
+            fingerprint = make_set_key(
                 date_str,
-                row.get("Exercise", ""),
+                exercise,
                 row.get("Reps", ""),
                 row.get("Weight(kg)", ""),
                 row.get("Duration(s)", ""),
                 row.get("Distance(m)", ""),
             )
-
-            # Track the newest workout date seen -- becomes the watermark.
-            dt = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S %z")
-            if newest_date is None or dt > newest_date:
-                newest_date = dt
-
             is_warmup = 1 if (row.get("isWarmup") or "").strip().lower() == "true" else 0
+            workouts.setdefault(canonical_date, []).append({
+                "fingerprint": fingerprint,
+                "workout_date": canonical_date,
+                "exercise": exercise,
+                "reps": float((row.get("Reps") or "0").strip() or 0),
+                "weight_kg": float((row.get("Weight(kg)") or "0").strip() or 0),
+                "duration_s": float((row.get("Duration(s)") or "0").strip() or 0),
+                "distance_m": float((row.get("Distance(m)") or "0").strip() or 0),
+                "is_warmup": is_warmup,
+            })
+
+    # Flatten the groups back into one batch, assigning occurrence indices.
+    # The 2nd identical set in a workout gets "#1", the 3rd "#2" -- distinct
+    # keys, all kept. (A second export of the same workout produces the
+    # same indices, so OR IGNORE skips them.)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    batch = []
+    for sets in workouts.values():
+        occurrence = {}
+        for s in sets:
+            n = occurrence.get(s["fingerprint"], 0)
+            occurrence[s["fingerprint"]] = n + 1
             batch.append((
-                key,
-                dt.isoformat(),
-                (row.get("Exercise") or "").strip(),
-                float((row.get("Reps") or "0").strip() or 0),
-                float((row.get("Weight(kg)") or "0").strip() or 0),
-                float((row.get("Duration(s)") or "0").strip() or 0),
-                float((row.get("Distance(m)") or "0").strip() or 0),
-                is_warmup,
-                datetime.now(timezone.utc).isoformat(),  # ingested_at
+                f"{s['fingerprint']}#{n}",
+                s["workout_date"],
+                s["exercise"],
+                s["reps"],
+                s["weight_kg"],
+                s["duration_s"],
+                s["distance_m"],
+                s["is_warmup"],
+                now_iso,
             ))
 
     # One executemany() sends all rows in a single round-trip instead of
     # thousands of individual INSERTs -- the difference between seconds and
-    # minutes on a 9,576-row file. OR IGNORE = "skip rows whose primary key
-    # already exists" = the dedupe, enforced by the database.
+    # minutes on a 9,586-row file. OR IGNORE = "skip rows whose primary key
+    # already exists".
     cur.executemany(
         """INSERT OR IGNORE INTO fitbod_sets
            (set_key, workout_date, exercise, reps, weight_kg,
@@ -390,15 +491,15 @@ def ingest_fitbod_csv(csv_path):
     conn.commit()
 
     inserted = conn.total_changes - before
-    skipped = rows_seen - inserted
     if newest_date:
         set_state("last_fitbod_ingest", newest_date.isoformat())
     conn.close()
 
     print(f"Rows in CSV : {rows_seen}")
     print(f"New sets    : {inserted}")
-    print(f"Duplicates  : {skipped} (already in database, skipped)")
-    return {"seen": rows_seen, "inserted": inserted, "skipped": skipped}
+    print(f"Cardio      : {cardio_skipped} (blocklisted exercise, skipped)")
+    return {"seen": rows_seen, "inserted": inserted,
+            "cardio_skipped": cardio_skipped}
 
 
 # ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@ To get feedback from AI, I've been manually sending snapshots of workout data to
 
 I'm building this pipeline to bring that data together and keep my training data independent of any one AI model. The goal is to give analysis and coaching a consistent history to work from, while letting me change models without rebuilding the data pipeline.
 
-Today, the Python ingestion layer imports Fitbod workout CSV exports and retrieves Apple Health workout records through health-cli, storing both in SQLite. It prevents repeat imports without dropping repeated sets I actually performed. Analysis and AI coaching are next. Nutrition tracking to follow. 
+Today, the Python ingestion layer imports Fitbod workout CSV exports and retrieves Apple Health workout records through `health-cli`, storing both in SQLite. It prevents repeat imports without dropping repeated sets I actually performed. Analysis and AI coaching are next. Nutrition tracking to follow. 
 
 ## Architecture
 

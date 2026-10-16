@@ -8,6 +8,16 @@ I'm building this pipeline to bring that data together and keep my training data
 
 Today, the Python ingestion layer imports Fitbod workout CSV exports and retrieves Apple Health workout records through `health-cli`, storing both in SQLite. It prevents repeat imports without dropping repeated sets I actually performed. Analysis and AI coaching are next. Nutrition tracking to follow. 
 
+## Tools used
+
+- **Fitbod:** the app I lift with. It exports my workout history as a CSV, which is one of the pipeline's two inputs.
+- **Apple Health:** where my Apple Watch runs and heart-rate data live on my phone. It's the other input.
+- **health-cli:** a command-line tool that ships with the Muse platform. The Python code calls it to read workouts from Apple Health.
+- **Python:** the language the ingestion code is written in. It's standard library only, so there's nothing extra to install.
+- **SQLite:** the database. My whole training history lives in a single file.
+- **Muse:** Meta's AI assistant. It wrote the code to my design, and I chat with it to run imports and get post-workout analysis.
+- **Scriptable:** an iPhone app that runs small scripts. I use it for the macro-tracker widget on my home screen, a separate companion tool.
+
 ## Architecture
 
 ```text
@@ -147,3 +157,7 @@ The next step is to make the combined training history useful in two ways:
 I haven't settled on the best way to present the recommendations yet: through the assistant, a dashboard, or a regular recap.
 
 The goal is to keep the training data separate from the AI model, so I can try different models for analysis and coaching without rebuilding the ingestion pipeline.
+
+## Related tool: macro tracker
+
+I report meals and snacks to Muse, which tracks daily totals against my calorie and nutrient targets. A Scriptable home-screen widget shows what I've eaten and what's left without opening the chat. This is a separate companion tool; nutrition data isn't connected to the pipeline yet.

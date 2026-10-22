@@ -1,6 +1,6 @@
 {
   "date": "2026-10-22",
-  "updated_at": "2026-10-22T00:01:50-04:00",
+  "updated_at": "2026-10-22T06:43:09-04:00",
   "targets": {
     "calories": 2870,
     "protein": 160,
@@ -10,10 +10,10 @@
     "fiber_max": 40
   },
   "consumed": {
-    "calories": 0,
-    "protein": 0,
-    "carbs": 0,
-    "fat": 0,
-    "fiber": 0
+    "calories": 501.5,
+    "protein": 24,
+    "carbs": 91.6,
+    "fat": 6,
+    "fiber": 8
   }
 }

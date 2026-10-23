@@ -51,6 +51,8 @@ I interact with the pipeline through Muse, an AI assistant: I share a Fitbod CSV
 
 The Python ingestion code is separate from the chat interface. That lets me change how I interact with the pipeline without changing the underlying import logic.
 
+I'm planning to try Muse as my day-to-day coach (October 2026). That would run separately from the pipeline in this repo. The plan: when I send Muse a Fitbod export, it adds new workouts to a private Google Sheet, writes a summary of each one, and proposes plan changes for me to approve. Muse would also save my Apple Health cardio workouts to the same Sheet. The Sheet is private and isn't part of this repo.
+
 ## Handling duplicate workout data
 
 Fitbod exports my entire workout history each time, not just the latest session. That means importing a new file would add the same sets again unless the pipeline checks what's already there. Comparing the raw rows isn't enough: the same weight can appear as `7.937875915123695` in one export and `7.94` in another.
@@ -71,6 +73,8 @@ The SQLite database (`training.db`) has three tables:
 - `ingestion_state`: Tracks import progress, including the latest Fitbod workout date imported and when Apple Health ingestion last ran.
 
 Keeping Fitbod sets and Apple Health workouts separate preserves the detail from each source while making both available for analysis in one database.
+
+The Sheet and the SQLite database wouldn't share data. The Sheet's Apple Health rows come from Muse's own connector, not from health-cli, so the two can hold different workouts. Fitbod's export has no set order or set ID, so the Sheet keeps one row per set and avoids duplicates by comparing how many identical sets each workout has. If a past workout changes in the export, it gets flagged for me to review. Fitbod also writes my strength workouts into Health as duration and calories only, so I leave those out of the cardio tab.
 
 ## Usage
 
@@ -151,7 +155,7 @@ Muse wrote the Python code and SQL schema. I reviewed the code and asked for cha
 
 The next step is to make the combined training history useful in two ways:
 
-- **Analysis:** Compare each workout with my training plan and recent history, then save a summary to the database. I'd want to see things like personal bests, missed targets, and changes in pace or heart rate that are worth a closer look.
+- **Analysis:** I'm testing Muse writing a per-workout summary and comparison for lifting and running into the Sheet. I haven't decided whether that should also be saved in the database or replace it.
 - **Coaching:** Use those summaries and my training history to suggest what to do next, including possible changes to upcoming workouts and when to prioritize recovery. Nutrition tracking and fueling feedback would follow.
 
 I haven't settled on the best way to present the recommendations yet: through the assistant, a dashboard, or a regular recap.
@@ -160,4 +164,4 @@ The goal is to keep the training data separate from the AI model, so I can try d
 
 ## Related tool: macro tracker
 
-I report meals and snacks to Muse, which tracks daily totals against my calorie and nutrient targets. A Scriptable home-screen widget shows what I've eaten and what's left without opening the chat. This is a separate companion tool; nutrition data isn't connected to the pipeline yet.
+I report meals and snacks to Muse, which tracks daily totals against my calorie and nutrient targets. A Scriptable home-screen widget shows what I've eaten and what's left without opening the chat. Daily nutrition totals are also going into the same private Sheet, not the SQLite database. Nutrition still isn't part of the pipeline.

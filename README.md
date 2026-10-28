@@ -10,7 +10,9 @@ On top of that history sits a coaching layer, which hit v1 in October 2026: an A
 
 ## What the output looks like now
 
-Early on, post-workout answers came back as long paragraphs, and the format kept changing. Finding the one thing I wanted meant re-reading the whole reply. I art-directed the outputs into fixed, glanceable card templates, iterating in the chat until the information I check first was on top. What actually improved: a clearer hierarchy (headline stats and the verdict up top) and more cautious interpretation (comparisons are labeled against my own logged history, not generic benchmarks).
+Early on, post-workout answers came back as long paragraphs, and the format kept changing. Finding the one thing I wanted meant re-reading the whole reply. 
+
+I designed the outputs into fixed, glanceable card templates, iterating in the chat until the information I check first was on top. What actually improved: a clearer hierarchy (headline stats and the verdict up top) and more cautious interpretation (comparisons are labeled against my own logged history, not generic benchmarks).
 
 Before: a real post-run debrief from my logs (paragraphs, no structure).
 

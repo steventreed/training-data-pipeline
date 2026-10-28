@@ -1,6 +1,6 @@
 # Workout Data Pipeline
 
-I've been training for marathons this year (Copenhagen May 2026; Philadelphia Nov 2026) and I have a ton of data available to analyze and help me make progress. Unfortunately, that data is siloed across various apps (Fitbod for weightlifting; Apple Watch/Health for running, heart rate, other vitals; Google Sheets for my training schedule; various LLMs for nutrition tracking).
+I've been training for marathons this year (Copenhagen May 2026; Philadelphia Nov 2026) and I have a ton of data available from various apps to analyze and help me make progress. Unfortunately, that data is siloed across various apps (Fitbod for weightlifting; Apple Watch/Health for running, heart rate, other vitals; Google Sheets for my training schedule; various LLMs for nutrition tracking).
 
 To get feedback from AI, I was manually sending snapshots of workout data to different LLMs. It was cumbersome and unreliable.
 

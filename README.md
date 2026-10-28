@@ -16,17 +16,17 @@ I designed the outputs into fixed, glanceable card templates, iterating in the c
 
 Before: a real post-run debrief from my logs (paragraphs, no structure).
 
-![Post-run debrief as prose paragraphs](docs/images/before-run-debrief.png)
+![Post-run debrief as prose paragraphs](docs/images/before-run-debrief.png?v=087c43e498)
 
 After: the same run (Oct 24, 2026) as a recap card. Headline stats up top, the verdict, mile-split pacing, and comparisons against my own recent history.
 
-![The same run rendered as a visual recap card](docs/images/after-run-recap.png)
+![The same run rendered as a visual recap card](docs/images/after-run-recap.png?v=087c43e498)
 
 The weightlifting report got the same treatment: muscle-group figures with primary and secondary set counts I can expand to see contributing exercises, a Today / This week toggle with the exact date window labeled next to each total, weekly volume, per-lift change versus last session, and a next-time note.
 
-![Lift report card: records, muscles worked, weekly volume](docs/images/after-lift-report.png)
+![Lift report card: records, muscles worked, weekly volume](docs/images/after-lift-report.png?v=087c43e498)
 
-![Lift report card: weekly volume and per-lift comparison](docs/images/after-lift-volume.png)
+![Lift report card: weekly volume and per-lift comparison](docs/images/after-lift-volume.png?v=087c43e498)
 
 ## How the coaching layer works today
 

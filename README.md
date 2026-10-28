@@ -22,7 +22,7 @@ After: the same run (Oct 24, 2026) as a recap card. Headline stats up top, the v
 
 ![The same run rendered as a visual recap card](docs/images/after-run-recap.png)
 
-The lift report got the same treatment: muscle-group figures with primary and secondary set counts I can expand to see contributing exercises, a Today / This week toggle with the exact date window labeled next to each total, weekly volume, per-lift change versus last session, and a next-time note.
+The weightlifting report got the same treatment: muscle-group figures with primary and secondary set counts I can expand to see contributing exercises, a Today / This week toggle with the exact date window labeled next to each total, weekly volume, per-lift change versus last session, and a next-time note.
 
 ![Lift report card: records, muscles worked, weekly volume](docs/images/after-lift-report.png)
 
